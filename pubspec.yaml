@@ -1,7 +1,7 @@
 name: flutter_auto_sign
 description: "A tool to automate Flutter app signing configuration"
 version: 0.0.1
-homepage:
+homepage: https://github.com/JulioMARIE/flutter_auto_sign
 
 environment:
   sdk: '>=3.4.4 <4.0.0'
