@@ -5,3 +5,5 @@
 - Improve doc.
 ## 0.0.4
 - Improve doc.
+## 0.0.5
+- Improve doc.
