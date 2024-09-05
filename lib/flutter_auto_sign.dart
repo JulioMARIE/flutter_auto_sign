@@ -1,120 +1,95 @@
 library flutter_auto_sign;
 
 /// A Flutter auto sign.
-
 import 'dart:io';
 import 'package:args/args.dart';
+import 'package:path/path.dart' as path;
 import 'package:prompts/prompts.dart' as prompts;
 
 class FlutterAutoSign {
+  /// Configures the signing settings for the app.
   static Future<void> configure({
     String? keystorePath,
-    String? keystorePassword,
     String? keyAlias,
-    String? keyPassword,
   }) async {
-    keystorePath ??= prompts.get('Enter keystore path:');
+    keystorePath ??= getDefaultKeystorePath();
+    keyAlias ??= 'upload-alias';
 
     if (!await File(keystorePath).exists()) {
-      print('Cannot proceed without a valid keystore. Exiting.');
-      return;
-      // if (prompts.getBool('Keystore does not exist. Create a new one?', defaultsTo: true)) {
-      //   await _createKeystore(keystorePath);
-      // } else {
-      //   print('Cannot proceed without a valid keystore. Exiting.');
-      //   return;
-      // }
+      if (prompts.getBool('Keystore does not exist. Create a new one?', defaultsTo: true)) {
+        await _createKeystore(keystorePath, keyAlias);
+      } else {
+        print('Cannot proceed without a valid keystore. Exiting.');
+        return;
+      }
     }
 
-    // Demander le mot de passe de manière sécurisée
-    String promptPassword(String promptText) {
-      stdout.write(promptText);
-      stdin.echoMode = false;
-      String password = stdin.readLineSync() ?? '';
-      stdin.echoMode = true;
-      stdout.writeln();
-      return password;
-    }
-
-    keystorePassword ??= promptPassword('Enter keystore password: ');
-    keyAlias ??= prompts.get('Enter key alias:');
-    keyPassword ??= promptPassword('Enter key password: ');
-
-    // 1. Verify permissions
-    await _verifyFilePermissions(keystorePath);
-
-    // 2. Create key.properties file
     await _createKeyProperties(
       keystorePath: keystorePath,
-      keystorePassword: keystorePassword,
       keyAlias: keyAlias,
-      keyPassword: keyPassword,
     );
-
-    // 3. Update build.gradle
     await _updateBuildGradle();
 
     print('FlutterAutoSign: Configuration completed successfully.');
   }
 
-  // static Future<void> _createKeystore(String keystorePath) async {
-  //   final dname = prompts.get('Enter distinguished name for the key (e.g., "CN=Your Name, OU=Your Organizational Unit, O=Your Organization, L=Your City, S=Your State, C=Your Country Code"):');
-  //   final validity = prompts.get('Enter validity in days:', defaultsTo: '10000');
-  //   final keyAlg = prompts.get('Enter key algorithm:', defaultsTo: 'RSA');
-  //   final keySize = prompts.get('Enter key size:', defaultsTo: '2048');
-  //   final keystorePassword = prompts.get('Enter keystore password: ');
-  //   final keyPassword = prompts.get('Enter key password: ');
-  //
-  //   final result = await Process.start(
-  //       'keytool',
-  //       [
-  //         '-genkey',
-  //         '-v',
-  //         '-keystore', keystorePath,
-  //         '-alias', 'key',
-  //         '-keyalg', keyAlg,
-  //         '-keysize', keySize,
-  //         '-validity', validity,
-  //         '-dname', dname,
-  //         '-storepass', keystorePassword,
-  //         '-keypass', keyPassword
-  //       ],
-  //       mode: ProcessStartMode.inheritStdio
-  //   );
-  //
-  //   final exitCode = await result.exitCode;
-  //
-  //   if (exitCode != 0) {
-  //     print('Error creating keystore. Exiting.');
-  //     exit(1);
-  //   }
-  //
-  //   print('Keystore created successfully at $keystorePath');
-  // }
+  static String getDefaultKeystorePath() {
+    final homeDir = Platform.isWindows ? Platform.environment['USERPROFILE'] : Platform.environment['HOME'];
+    return path.join(homeDir!, 'upload-keystore.jks');
+  }
 
-  static Future<void> _verifyFilePermissions(String filePath) async {
-    final file = File(filePath);
-    if (!await file.exists()) {
-      throw FileSystemException('File does not exist', filePath);
+  static Future<void> _createKeystore(String keystorePath, String keyAlias) async {
+    final isWindows = Platform.isWindows;
+
+    print('You will be prompted to enter information for your keystore.');
+    print('Please follow the prompts from the keytool command.');
+
+    List<String> args;
+    if (isWindows) {
+      args = [
+        '-genkey', '-v',
+        '-keystore', keystorePath,
+        '-storetype', 'JKS',
+        '-keyalg', 'RSA',
+        '-keysize', '2048',
+        '-validity', '10000',
+        '-alias', keyAlias,
+      ];
+    } else {
+      args = [
+        '-genkey', '-v',
+        '-keystore', keystorePath,
+        '-keyalg', 'RSA',
+        '-keysize', '2048',
+        '-validity', '10000',
+        '-alias', keyAlias,
+      ];
     }
 
     try {
-      await file.open(mode: FileMode.read);
-      await file.open(mode: FileMode.write);
+      final process = await Process.start('keytool', args, mode: ProcessStartMode.inheritStdio);
+      final exitCode = await process.exitCode;
+
+      if (exitCode != 0) {
+        print('Error: keytool command failed with exit code $exitCode');
+        exit(1);
+      }
+
+      print('Keystore created successfully at $keystorePath');
     } catch (e) {
-      throw FileSystemException('Insufficient permissions for file', filePath);
+      print('Error executing keytool command: $e');
+      print('Please make sure you have Java installed and keytool is available in your PATH.');
+      exit(1);
     }
   }
 
   static Future<void> _createKeyProperties({
     required String keystorePath,
-    required String keystorePassword,
     required String keyAlias,
-    required String keyPassword,
   }) async {
     final content = '''
-storePassword=$keystorePassword
-keyPassword=$keyPassword
+storePassword=
+keyPassword=
 keyAlias=$keyAlias
 storeFile=$keystorePath
 ''';
@@ -196,21 +171,16 @@ if (keystorePropertiesFile.exists()) {
     }
   }
 
-
   static void main(List<String> arguments) async {
     final parser = ArgParser()
-      ..addOption('keystorePath', abbr: 'k', help: 'Path to the keystore file')
-      ..addOption('keystorePassword', abbr: 'p', help: 'Keystore password')
-      ..addOption('keyAlias', abbr: 'a', help: 'Key alias')
-      ..addOption('keyPassword', abbr: 'w', help: 'Key password');
+      ..addOption('keystorePath', abbr: 'p', help: 'Path to the keystore file')
+      ..addOption('keyAlias', abbr: 'a', help: 'Key alias');
 
     final results = parser.parse(arguments);
 
     await configure(
       keystorePath: results['keystorePath'],
-      keystorePassword: results['keystorePassword'],
       keyAlias: results['keyAlias'],
-      keyPassword: results['keyPassword'],
     );
   }
 }
