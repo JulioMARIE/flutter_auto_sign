@@ -1,6 +1,6 @@
 name: flutter_auto_sign
 description: "A tool to automate Flutter app signing configuration and create key tool"
-version: 0.0.1
+version: 0.0.4
 homepage: https://github.com/JulioMARIE/flutter_auto_sign
 repository: https://github.com/JulioMARIE/flutter_auto_sign.git
 documentation: https://github.com/JulioMARIE/flutter_auto_sign/blob/main/README.md
