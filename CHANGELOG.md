@@ -1,9 +1,13 @@
+## 0.0.6
+- Improve documentation.
+## 0.0.5
+- Improve documentation.
+## 0.0.4
+- Improve documentation.
+## 0.0.3
+- Improve documentation.
 ## 0.0.2
 - Initial release of `flutter_auto_sign`.
-- Ajout de la configuration automatique des clés et de la signature pour Android.
-## 0.0.3
-- Improve doc.
-## 0.0.4
-- Improve doc.
-## 0.0.5
-- Improve doc.
+- Add creation of jks file for android signed key.
+## 0.0.1
+- Create key.properties files and change app/build.gradle
